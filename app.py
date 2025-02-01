@@ -5,6 +5,7 @@ import requests
 from io import BytesIO
 import base64
 import os
+import uuid
 
 app = Flask(__name__)
 CORS(app)
@@ -43,28 +44,32 @@ def process_image():
         business_name = data.get('business_name')
         business_logo_url = data.get('business_logo_url')
         hashtags = data.get('hashtags', [])
+        supabase_url = data.get('supabase_url')
+        supabase_key = data.get('supabase_key')
 
-        if not image_url or not business_name:
+        if not image_url or not business_name or not supabase_url or not supabase_key:
             return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
 
-        # Download the main image
-        response = requests.get(image_url)
-        if response.status_code != 200:
-            return jsonify({'success': False, 'error': 'Failed to download image'}), 400
+        print(f"Processing request with image_url: {image_url}")
+        print(f"Business name: {business_name}")
+        print(f"Logo URL: {business_logo_url}")
+        print(f"Hashtags: {hashtags}")
 
-        # Open and process the main image
-        img = Image.open(BytesIO(response.content)).convert('RGBA')
-        
-        # Create a drawing object
-        draw = ImageDraw.Draw(img)
+        # Download and process the main image
+        try:
+            response = requests.get(image_url, timeout=10)
+            response.raise_for_status()
+            img = Image.open(BytesIO(response.content)).convert('RGBA')
+        except Exception as e:
+            print(f"Error processing main image: {str(e)}")
+            return jsonify({'success': False, 'error': f'Failed to process image: {str(e)}'}), 400
 
-        # Load fonts with proper paths
+        # Load fonts
         try:
             business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 72)
             hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 36)
         except:
             print("Font loading error - downloading fonts...")
-            # Download and save Roboto fonts if they don't exist
             font_urls = {
                 'Roboto-Bold.ttf': 'https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Bold.ttf',
                 'Roboto-Regular.ttf': 'https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Regular.ttf'
@@ -73,43 +78,41 @@ def process_image():
             for font_name, font_url in font_urls.items():
                 font_path = os.path.join(FONT_DIR, font_name)
                 if not os.path.exists(font_path):
-                    font_response = requests.get(font_url)
-                    if font_response.status_code == 200:
+                    try:
+                        font_response = requests.get(font_url, timeout=10)
+                        font_response.raise_for_status()
                         with open(font_path, 'wb') as f:
                             f.write(font_response.content)
+                    except Exception as e:
+                        print(f"Error downloading font {font_name}: {str(e)}")
+                        return jsonify({'success': False, 'error': f'Failed to download font {font_name}: {str(e)}'}), 500
             
-            # Try loading fonts again
             business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 72)
             hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 36)
 
-        # Colors
-        business_color = "#9b87f5"  # Purple
-        hashtag_color = "#D6BCFA"  # Light purple
-        
+        draw = ImageDraw.Draw(img)
         padding = 20
         logo_height = 0
 
         # Process logo if provided
         if business_logo_url:
             try:
-                logo_response = requests.get(business_logo_url)
-                if logo_response.status_code == 200:
-                    logo = Image.open(BytesIO(logo_response.content)).convert('RGBA')
-                    logo = resize_logo(logo, img.width)
-                    img.paste(logo, (padding, padding), logo)
-                    logo_height = logo.height
+                logo_response = requests.get(business_logo_url, timeout=10)
+                logo_response.raise_for_status()
+                logo = Image.open(BytesIO(logo_response.content)).convert('RGBA')
+                logo = resize_logo(logo, img.width)
+                img.paste(logo, (padding, padding), logo)
+                logo_height = logo.height
             except Exception as e:
                 print(f"Error processing logo: {str(e)}")
 
-        # Calculate text position (below logo if present)
+        # Add business name and hashtags
         text_y = padding + logo_height + (padding if logo_height > 0 else 0)
-
-        # Get text size for background
         text_bbox = draw.textbbox((0, 0), business_name, font=business_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
 
-        # Create gradient background for business name
+        # Create gradient backgrounds and add text
         gradient_height = text_height + padding * 2
         gradient = create_gradient_background(
             (img.width, gradient_height + text_y),
@@ -118,24 +121,21 @@ def process_image():
         )
         img.paste(gradient, (0, 0), gradient)
 
-        # Add business name with shadow effect
-        shadow_offset = 3  # Reduced shadow offset for more subtle effect
-        # Draw shadow
+        # Add business name with shadow
         draw.text(
-            (padding + shadow_offset, text_y + shadow_offset),
+            (padding + 3, text_y + 3),
             business_name,
             font=business_font,
-            fill=(0, 0, 0, 160)  # More transparent shadow
+            fill=(0, 0, 0, 160)
         )
-        # Draw main text
         draw.text(
             (padding, text_y),
             business_name,
             font=business_font,
-            fill=business_color
+            fill="#9b87f5"
         )
 
-        # Add hashtags at the bottom
+        # Add hashtags
         if hashtags:
             hashtag_gradient_height = 80
             bottom_gradient = create_gradient_background(
@@ -157,34 +157,49 @@ def process_image():
             y_position = img.height - hashtag_gradient_height + padding
             
             for hashtag in hashtag_texts:
-                # Add hashtag with subtle shadow
                 draw.text(
                     (x_position + 2, y_position + 2),
                     hashtag,
                     font=hashtag_font,
-                    fill=(0, 0, 0, 140)  # More transparent shadow
+                    fill=(0, 0, 0, 140)
                 )
                 draw.text(
                     (x_position, y_position),
                     hashtag,
                     font=hashtag_font,
-                    fill=hashtag_color
+                    fill="#D6BCFA"
                 )
                 x_position += draw.textlength(hashtag, font=hashtag_font) + spacing
 
-        # Convert to RGB for JPEG saving
+        # Convert to RGB and save
         img = img.convert('RGB')
-        
-        # Save to BytesIO
         buffered = BytesIO()
         img.save(buffered, format="JPEG", quality=95)
         
-        # Convert to base64
-        img_str = base64.b64encode(buffered.getvalue()).decode()
+        # Upload to Supabase storage
+        headers = {
+            'Authorization': f'Bearer {supabase_key}',
+            'apikey': supabase_key
+        }
+        
+        filename = f"{uuid.uuid4()}.jpg"
+        upload_url = f"{supabase_url}/storage/v1/object/media-sets-images/{filename}"
+        
+        files = {
+            'file': ('image.jpg', buffered.getvalue(), 'image/jpeg')
+        }
+        
+        upload_response = requests.post(upload_url, headers=headers, files=files)
+        if upload_response.status_code != 200:
+            print(f"Upload error: {upload_response.text}")
+            return jsonify({'success': False, 'error': 'Failed to upload to storage'}), 500
+
+        # Get the public URL
+        public_url = f"{supabase_url}/storage/v1/object/public/media-sets-images/{filename}"
         
         return jsonify({
             'success': True,
-            'image': f'data:image/jpeg;base64,{img_str}'
+            'url': public_url
         })
 
     except Exception as e:
