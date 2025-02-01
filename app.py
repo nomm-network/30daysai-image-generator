@@ -64,15 +64,15 @@ def process_image():
             print(f"Error processing main image: {str(e)}")
             return jsonify({'success': False, 'error': f'Failed to process image: {str(e)}'}), 400
 
-        # Load fonts
+        # Load fonts - Updated font URLs
         try:
             business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 72)
             hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 36)
         except:
             print("Font loading error - downloading fonts...")
             font_urls = {
-                'Roboto-Bold.ttf': 'https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Bold.ttf',
-                'Roboto-Regular.ttf': 'https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Regular.ttf'
+                'Roboto-Bold.ttf': 'https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Bold.ttf',
+                'Roboto-Regular.ttf': 'https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Regular.ttf'
             }
             
             for font_name, font_url in font_urls.items():
