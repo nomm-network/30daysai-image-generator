@@ -66,8 +66,8 @@ def process_image():
 
         # Load fonts - Updated font URLs
         try:
-            business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 72)
-            hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 36)
+            business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 48)
+            hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 32)
         except:
             print("Font loading error - downloading fonts...")
             font_urls = {
