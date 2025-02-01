@@ -53,8 +53,8 @@ def process_image():
 
         # Load fonts (adjust paths based on your environment)
         try:
-            business_font = ImageFont.truetype("Arial Bold.ttf", 72)  # Increased from 48 to 72
-            hashtag_font = ImageFont.truetype("Arial.ttf", 36)  # Increased from 24 to 36
+            business_font = ImageFont.truetype("Arial Bold.ttf", 96)  # Increased from 72 to 96
+            hashtag_font = ImageFont.truetype("Arial.ttf", 48)  # Increased from 36 to 48
         except:
             # Fallback to default font if custom font not available
             business_font = ImageFont.load_default()
@@ -99,7 +99,7 @@ def process_image():
         img.paste(gradient, (0, 0), gradient)
 
         # Add business name with shadow effect
-        shadow_offset = 3  # Increased shadow offset for larger font
+        shadow_offset = 4  # Increased shadow offset for larger font
         # Draw shadow
         draw.text(
             (padding + shadow_offset, text_y + shadow_offset),
@@ -115,10 +115,10 @@ def process_image():
             fill=business_color
         )
 
-        # Add hashtags at the bottom
+        # Add hashtags at the bottom with more padding
         if hashtags:
             # Create gradient background for hashtags
-            hashtag_gradient_height = (len(hashtags) * 45) + padding * 2  # Increased height for larger font
+            hashtag_gradient_height = 80  # Fixed height for single row
             bottom_gradient = create_gradient_background(
                 (img.width, hashtag_gradient_height),
                 (0, 0, 0, 0),
@@ -130,23 +130,30 @@ def process_image():
                 bottom_gradient
             )
 
-            # Add hashtags
+            # Calculate total width of all hashtags
+            hashtag_texts = [f"#{tag}" for tag in hashtags]
+            total_width = sum(draw.textlength(text, font=hashtag_font) for text in hashtag_texts)
+            spacing = (img.width - 2 * padding - total_width) / (len(hashtags) - 1) if len(hashtags) > 1 else 0
+            
+            # Add hashtags in a single row
+            x_position = padding
             y_position = img.height - hashtag_gradient_height + padding
-            for hashtag in hashtags:
+            
+            for hashtag in hashtag_texts:
                 # Add hashtag with shadow
                 draw.text(
-                    (padding + 2, y_position + 2),  # Increased shadow offset
-                    f"#{hashtag}",
+                    (x_position + 2, y_position + 2),
+                    hashtag,
                     font=hashtag_font,
                     fill="black"
                 )
                 draw.text(
-                    (padding, y_position),
-                    f"#{hashtag}",
+                    (x_position, y_position),
+                    hashtag,
                     font=hashtag_font,
                     fill=hashtag_color
                 )
-                y_position += 45  # Increased spacing for larger font
+                x_position += draw.textlength(hashtag, font=hashtag_font) + spacing
 
         # Convert to RGB for JPEG saving
         img = img.convert('RGB')
