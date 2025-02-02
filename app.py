@@ -87,8 +87,8 @@ def process_image():
                         print(f"Error downloading font {font_name}: {str(e)}")
                         return jsonify({'success': False, 'error': f'Failed to download font {font_name}: {str(e)}'}), 500
             
-            business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 72)
-            hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 36)
+            business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 48)
+            hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 32)
 
         draw = ImageDraw.Draw(img)
         padding = 20
@@ -132,7 +132,7 @@ def process_image():
             (padding, text_y),
             business_name,
             font=business_font,
-            fill="#9b87f5"
+            fill="#000205"
         )
 
         # Add hashtags
@@ -167,7 +167,7 @@ def process_image():
                     (x_position, y_position),
                     hashtag,
                     font=hashtag_font,
-                    fill="#D6BCFA"
+                    fill="#000205"
                 )
                 x_position += draw.textlength(hashtag, font=hashtag_font) + spacing
 
