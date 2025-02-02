@@ -66,7 +66,7 @@ def process_image():
 
         # Load fonts - Updated font URLs
         try:
-            business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 48)
+            business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 42)
             hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 32)
         except:
             print("Font loading error - downloading fonts...")
@@ -132,7 +132,7 @@ def process_image():
             (padding, text_y),
             business_name,
             font=business_font,
-            fill="#000205"
+            fill="#c9eb63"
         )
 
         # Add hashtags
@@ -167,7 +167,7 @@ def process_image():
                     (x_position, y_position),
                     hashtag,
                     font=hashtag_font,
-                    fill="#000205"
+                    fill="#c9eb63"
                 )
                 x_position += draw.textlength(hashtag, font=hashtag_font) + spacing
 
