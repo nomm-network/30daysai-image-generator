@@ -6,20 +6,32 @@ from io import BytesIO
 import base64
 import os
 import uuid
+import re
+import unicodedata
 
 app = Flask(__name__)
 CORS(app)
 
-# Get the directory where the script is located
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.path.join(SCRIPT_DIR, 'fonts')
-
-# Ensure the fonts directory exists
 os.makedirs(FONT_DIR, exist_ok=True)
+
+def normalize_business_name(name):
+    """Convert business name to hashtag format"""
+    # Normalize unicode characters
+    name = unicodedata.normalize('NFKD', name)
+    # Convert to ASCII, ignore special characters
+    name = name.encode('ASCII', 'ignore').decode('ASCII')
+    # Convert to lowercase and remove all special characters
+    name = re.sub(r'[^a-zA-Z0-9\s]', '', name.lower())
+    # Replace multiple spaces with single space and trim
+    name = re.sub(r'\s+', ' ', name).strip()
+    # Remove spaces and add hashtag
+    return f"#{name.replace(' ', '')}"
 
 def resize_logo(logo_img, main_image_width):
     """Resize logo to be 15% of the main image width"""
-    target_width = int(main_image_width * 0.15)  # 15% of main image width
+    target_width = int(main_image_width * 0.15)
     aspect_ratio = logo_img.width / logo_img.height
     target_height = int(target_width / aspect_ratio)
     return logo_img.resize((target_width, target_height), Image.LANCZOS)
@@ -32,6 +44,24 @@ def create_gradient_background(size, color1=(0,0,0,180), color2=(0,0,0,0)):
         alpha = int((1 - y/size[1]) * color1[3] + (y/size[1]) * color2[3])
         draw.line([(0,y), (size[0],y)], fill=(color1[0], color1[1], color1[2], alpha))
     return background
+
+def draw_text_with_stroke(draw, text, position, font, main_color="#c9eb63", stroke_color=(0, 0, 0), stroke_width=2):
+    """Draw text with stroke effect"""
+    x, y = position
+    
+    # Draw stroke
+    for offset_x in range(-stroke_width, stroke_width + 1):
+        for offset_y in range(-stroke_width, stroke_width + 1):
+            if offset_x != 0 or offset_y != 0:  # Skip the center position
+                draw.text(
+                    (x + offset_x, y + offset_y),
+                    text,
+                    font=font,
+                    fill=stroke_color
+                )
+    
+    # Draw main text
+    draw.text(position, text, font=font, fill=main_color)
 
 @app.route('/process-image', methods=['POST'])
 def process_image():
@@ -53,7 +83,7 @@ def process_image():
         print(f"Processing request with image_url: {image_url}")
         print(f"Business name: {business_name}")
         print(f"Logo URL: {business_logo_url}")
-        print(f"Hashtags: {hashtags}")
+        print(f"Hashtags to render: {hashtags}")
 
         # Download and process the main image
         try:
@@ -64,7 +94,7 @@ def process_image():
             print(f"Error processing main image: {str(e)}")
             return jsonify({'success': False, 'error': f'Failed to process image: {str(e)}'}), 400
 
-        # Load fonts - Updated font URLs
+        # Load fonts
         try:
             business_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Bold.ttf'), 42)
             hashtag_font = ImageFont.truetype(os.path.join(FONT_DIR, 'Roboto-Regular.ttf'), 32)
@@ -106,13 +136,13 @@ def process_image():
             except Exception as e:
                 print(f"Error processing logo: {str(e)}")
 
-        # Add business name and hashtags
+        # Add business name
         text_y = padding + logo_height + (padding if logo_height > 0 else 0)
         text_bbox = draw.textbbox((0, 0), business_name, font=business_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
 
-        # Create gradient backgrounds and add text
+        # Create gradient backgrounds
         gradient_height = text_height + padding * 2
         gradient = create_gradient_background(
             (img.width, gradient_height + text_y),
@@ -121,21 +151,15 @@ def process_image():
         )
         img.paste(gradient, (0, 0), gradient)
 
-        # Add business name with shadow
-        draw.text(
-            (padding + 3, text_y + 3),
+        # Add business name with stroke effect
+        draw_text_with_stroke(
+            draw,
             business_name,
-            font=business_font,
-            fill=(0, 0, 0, 160)
-        )
-        draw.text(
             (padding, text_y),
-            business_name,
-            font=business_font,
-            fill="#c9eb63"
+            business_font
         )
 
-        # Add hashtags
+        # Add hashtags if provided
         if hashtags:
             hashtag_gradient_height = 80
             bottom_gradient = create_gradient_background(
@@ -149,25 +173,33 @@ def process_image():
                 bottom_gradient
             )
 
-            hashtag_texts = [f"#{tag}" for tag in hashtags]
+            # Process hashtags
+            hashtag_texts = []
+            # Add business hashtag first
+            business_hashtag = normalize_business_name(business_name)
+            hashtag_texts.append(business_hashtag)
+            
+            # Add other hashtags
+            for tag in hashtags:
+                if not tag.startswith('#'):
+                    tag = f"#{tag}"
+                if tag not in hashtag_texts:  # Avoid duplicates
+                    hashtag_texts.append(tag)
+
+            # Calculate positions for hashtags
             total_width = sum(draw.textlength(text, font=hashtag_font) for text in hashtag_texts)
-            spacing = (img.width - 2 * padding - total_width) / (len(hashtags) - 1) if len(hashtags) > 1 else 0
+            spacing = (img.width - 2 * padding - total_width) / (len(hashtag_texts) - 1) if len(hashtag_texts) > 1 else 0
             
             x_position = padding
             y_position = img.height - hashtag_gradient_height + padding
-            
+
+            # Draw hashtags with stroke effect
             for hashtag in hashtag_texts:
-                draw.text(
-                    (x_position + 2, y_position + 2),
+                draw_text_with_stroke(
+                    draw,
                     hashtag,
-                    font=hashtag_font,
-                    fill=(0, 0, 0, 140)
-                )
-                draw.text(
                     (x_position, y_position),
-                    hashtag,
-                    font=hashtag_font,
-                    fill="#c9eb63"
+                    hashtag_font
                 )
                 x_position += draw.textlength(hashtag, font=hashtag_font) + spacing
 
