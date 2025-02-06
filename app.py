@@ -177,7 +177,7 @@ def process_image():
             hashtag_texts = []
             # Add business hashtag first
             business_hashtag = normalize_business_name(business_name)
-            hashtag_texts.append(business_hashtag)
+           # hashtag_texts.append(business_hashtag)
             
             # Add other hashtags
             for tag in hashtags:
